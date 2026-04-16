@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiago Robot Interface</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Blockly CDN -->
+  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+
+    #blockly-div {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Override Blockly injected size */
+    .blocklyWidgetDiv, .blocklyDropDownDiv { z-index: 9999; }
+
+    /* Execution log scrollbar */
+    #exec-log::-webkit-scrollbar,
+    #launch-log::-webkit-scrollbar { width: 4px; }
+    #exec-log::-webkit-scrollbar-thumb,
+    #launch-log::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+
+    /* Blockly toolbox category styling */
+    .blocklyToolboxDiv {
+      background: #111827 !important;
+      border-right: 2px solid #374151 !important;
+      padding: 8px 0 !important;
+    }
+
+    .blocklyTreeRow {
+      margin: 6px 8px !important;
+      border-radius: 8px !important;
+      padding: 10px 14px !important;
+      cursor: pointer !important;
+      transition: transform 0.1s, opacity 0.1s !important;
+    }
+
+    .blocklyTreeRow:hover {
+      transform: scale(1.03) !important;
+      opacity: 0.9 !important;
+    }
+
+    .blocklyTreeLabel {
+      font-size: 15px !important;
+      font-weight: 700 !important;
+      font-family: monospace !important;
+      letter-spacing: 0.05em !important;
+      color: #fff !important;
+    }
+
+    .blocklyTreeIcon {
+      display: none !important;
+    }
+
+    /* Always-on category colors */
+    .blocklyTreeRow:nth-child(1) { background: #166534 !important; } /* Motion  - green  */
+    .blocklyTreeRow:nth-child(2) { background: #1e3a8a !important; } /* Control - blue   */
+    .blocklyTreeRow:nth-child(3) { background: #92400e !important; } /* Sensors - orange */
+
+    /* Brighten on selected/hover */
+    .blocklyTreeRow:nth-child(1):hover,
+    .blocklyTreeSelected:nth-child(1) { background: #15803d !important; }
+    .blocklyTreeRow:nth-child(2):hover,
+    .blocklyTreeSelected:nth-child(2) { background: #1d4ed8 !important; }
+    .blocklyTreeRow:nth-child(3):hover,
+    .blocklyTreeSelected:nth-child(3) { background: #b45309 !important; }
+
+    /* Emergency stop pulse animation in DANGER */
+    .danger-pulse { animation: pulse-red 0.8s ease-in-out infinite; }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+      50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white" style="display:flex; flex-direction:column; height:100vh;">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SAFETY BAR — always on top
+  ════════════════════════════════════════════════════════════════════════ -->
+  <div id="safety-bar"
+       class="flex items-center justify-between px-4 py-2 bg-gray-600 transition-colors duration-300"
+       style="flex-shrink:0;">
+
+    <div class="flex items-center gap-6">
+      <span class="font-bold text-lg tracking-wide">SAFETY</span>
+      <span id="safety-label" class="font-mono text-base">◌ NO LIDAR</span>
+      <span id="safety-dist"  class="font-mono text-sm opacity-75"></span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <span id="ros-status" class="text-yellow-400 font-mono text-sm">○ Connecting…</span>
+      <button id="emergency-stop"
+              class="bg-red-600 hover:bg-red-500 active:bg-red-800 font-bold py-2 px-6 rounded-lg text-lg tracking-wider transition-colors">
+        ⬛ EMERGENCY STOP
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════════════════════════════ -->
+  <div style="display:flex; flex:1; overflow:hidden;">
+
+    <!-- Left: Blockly workspace -->
+    <div id="blockly-div" style="flex:1; min-width:0;"></div>
+
+    <!-- Right panel -->
+    <div style="width:360px; display:flex; flex-direction:column; border-left:1px solid #374151;">
+
+      <!-- Camera feed -->
+      <div style="flex:1; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <img id="camera-img"
+             class="hidden max-w-full max-h-full object-contain"
+             alt="Robot camera" />
+        <div id="no-camera" class="text-gray-500 text-sm text-center px-4">
+          <div class="text-4xl mb-2">📷</div>
+          <div>Camera not connected</div>
+          <div class="text-xs mt-1 text-gray-600">Start Video Server to enable</div>
+        </div>
+      </div>
+
+      <!-- Execution log -->
+      <div style="height:200px; background:#111827; border-top:1px solid #374151; display:flex; flex-direction:column;">
+        <div class="px-2 py-1 text-xs text-gray-500 font-mono border-b border-gray-700 flex-shrink-0">
+          Execution Log
+        </div>
+        <div id="exec-log"
+             class="flex-1 overflow-y-auto px-2 py-1 font-mono text-xs leading-relaxed">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       BOTTOM BAR
+  ════════════════════════════════════════════════════════════════════════ -->
+  <div style="flex-shrink:0; background:#1f2937; border-top:1px solid #374151;">
+
+    <!-- Launch panel row -->
+    <div class="flex items-center gap-2 px-3 py-1 border-b border-gray-700">
+      <span class="text-xs text-gray-500 font-mono mr-1">SERVICES</span>
+
+      <button id="btn-rosbridge"
+              class="px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500">
+        ○ ROSBridge
+      </button>
+
+      <button id="btn-video-server"
+              class="px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500">
+        ○ Video Server
+      </button>
+
+      <!-- Launch log (scrollable, inline) -->
+      <div id="launch-log"
+           class="flex-1 overflow-x-auto overflow-y-auto font-mono text-xs text-gray-400 bg-gray-900 rounded px-2 py-1"
+           style="max-height:36px; white-space:nowrap;">
+        <span class="text-gray-600">Click a service button to start it…</span>
+      </div>
+    </div>
+
+    <!-- Execute controls row -->
+    <div class="flex items-center justify-between px-3 py-2">
+      <div class="text-xs text-gray-500 font-mono">
+        Drag blocks from the toolbox → arrange sequence → Execute
+      </div>
+      <div class="flex gap-2">
+        <button id="clear-btn"
+                class="px-4 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-sm font-semibold">
+          Clear
+        </button>
+        <button id="execute-btn"
+                class="px-5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 active:bg-blue-800 text-sm font-bold transition-colors">
+          ▶ Execute
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       Scripts
+  ════════════════════════════════════════════════════════════════════════ -->
+  <script src="/js/blocks.js"></script>
+  <script src="/js/app.js"></script>
+
+</body>
+</html>
