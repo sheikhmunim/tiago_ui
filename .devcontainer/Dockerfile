@@ -34,6 +34,34 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
+
+# Install vision node dependencies
+RUN apt-get update && apt-get install -y \
+    ros-noetic-pcl-ros \
+    ros-noetic-pcl-conversions \
+    ros-noetic-message-filters \
+    ros-noetic-tf2 \
+    ros-noetic-tf2-ros \
+    ros-noetic-tf2-geometry-msgs \
+    libopencv-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime C++
+RUN cd /tmp && \
+    curl -L https://github.com/microsoft/onnxruntime/releases/download/v1.17.1/onnxruntime-linux-x64-1.17.1.tgz \
+    -o onnxruntime.tgz && \
+    tar -xzf onnxruntime.tgz && \
+    sudo cp -r onnxruntime-linux-x64-1.17.1/include/* /usr/local/include/ && \
+    sudo cp -r onnxruntime-linux-x64-1.17.1/lib/* /usr/local/lib/ && \
+    sudo ldconfig && \
+    rm -rf /tmp/onnxruntime*
+
+# Install ultralytics just for model export then remove it
+# Download pre-exported YOLOv8n ONNX directly
+# RUN sudo mkdir -p /models && \
+#     curl -L https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.onnx \
+#     -o /models/yolov8n.onnx
+
 # Install Python backend dependencies (system-wide so uvicorn is on PATH)
 RUN pip3 install --system fastapi "uvicorn[standard]" 2>/dev/null || \
     pip3 install fastapi "uvicorn[standard]"

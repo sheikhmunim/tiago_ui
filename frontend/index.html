@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Blockly CDN -->
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
 
   <style>
     html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -20,7 +20,13 @@
     }
 
     /* Override Blockly injected size */
+    /* .blocklyWidgetDiv, .blocklyDropDownDiv { z-index: 9999; } */
+
+        /* REPLACE with this: */
     .blocklyWidgetDiv, .blocklyDropDownDiv { z-index: 9999; }
+
+
+
 
     /* Execution log scrollbar */
     #exec-log::-webkit-scrollbar,
@@ -29,7 +35,7 @@
     #launch-log::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
 
     /* Blockly toolbox category styling */
-    .blocklyToolboxDiv {
+    /* .blocklyToolboxDiv {
       background: #111827 !important;
       border-right: 2px solid #374151 !important;
       padding: 8px 0 !important;
@@ -54,11 +60,71 @@
       font-family: monospace !important;
       letter-spacing: 0.05em !important;
       color: #fff !important;
+      margin-left: -10px !important;
+      line-height: 1 !important;
+    }
+
+    .blocklyTreeIcon {
+      display: none !important;
+    } */
+
+    .blocklyToolboxDiv {
+      background: #111827 !important;
+      border-right: 2px solid #374151 !important;
+      padding: 8px 0 !important;
+      width: 200px !important;
+    }
+
+    .blocklyTreeRow {
+      margin: 6px 8px !important;
+      border-radius: 8px !important;
+      padding: 20px 22px !important;
+      cursor: pointer !important;
+      transition: transform 0.1s, opacity 0.1s !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;  /* centers text horizontally */
+    }
+
+    .blocklyTreeRow:hover {
+      transform: scale(1.03) !important;
+      opacity: 0.9 !important;
+    }
+
+    .blocklyTreeLabel {
+      font-size: 15px !important;
+      font-weight: 700 !important;
+      font-family: monospace !important;
+      letter-spacing: 0.05em !important;
+      color: #fff !important;
     }
 
     .blocklyTreeIcon {
       display: none !important;
     }
+
+
+    /* Hide Blockly flyout scrollbar */
+    .blocklyFlyoutScrollbar {
+      display: none !important;
+    }
+
+    /* Or make it thinner and auto-hide */
+    .blocklyScrollbarHandle {
+      fill: #374151 !important;
+      opacity: 0 !important;
+      transition: opacity 0.3s !important;
+    }
+
+    .blocklyScrollbarHandle:hover {
+      opacity: 1 !important;
+    }
+
+
+
+
+
+
 
     /* Always-on category colors */
     .blocklyTreeRow:nth-child(1) { background: #166534 !important; } /* Motion  - green  */
@@ -111,8 +177,8 @@
   <div style="display:flex; flex:1; overflow:hidden;">
 
     <!-- Left: Blockly workspace -->
-    <div id="blockly-div" style="flex:1; min-width:0;"></div>
-
+    <!-- <div id="blockly-div" style="flex:1; min-width:0;"></div> -->
+    <div id="blockly-div" style="flex:1; min-width:0; position:relative;"></div>
     <!-- Right panel -->
     <div style="width:360px; display:flex; flex-direction:column; border-left:1px solid #374151;">
 

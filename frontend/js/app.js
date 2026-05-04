@@ -58,6 +58,7 @@ const workspace = Blockly.inject("blockly-div", {
   trashcan: true,
   zoom: { controls: true, wheel: true, startScale: 1.0 },
   theme: Blockly.Themes.Dark,
+  renderer: 'zelos',
 });
 
 // ---------------------------------------------------------------------------
@@ -338,7 +339,33 @@ function playBeep(freq, duration) {
 }
 
 // ---------------------------------------------------------------------------
+// Fix: preserve scroll position when blocks are added from the flyout.
+// Blockly can reset the workspace viewport after flyout closes, making
+// previously placed blocks scroll off-screen ("vanish").
+// ---------------------------------------------------------------------------
+(function () {
+  let scrollX = 0;
+  let scrollY = 0;
+
+  // Capture scroll before the flyout interaction
+  workspace.addChangeListener(function (event) {
+    if (event.type === Blockly.Events.BLOCK_CREATE) {
+      // Restore the scroll position the user had before clicking the flyout
+      workspace.scroll(scrollX, scrollY);
+    } else if (
+      event.type !== Blockly.Events.BLOCK_DRAG &&
+      event.type !== Blockly.Events.SELECTED
+    ) {
+      // Keep tracking current scroll so we can restore it
+      scrollX = workspace.scrollX;
+      scrollY = workspace.scrollY;
+    }
+  });
+})();
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+window.addEventListener("resize", () => Blockly.svgResize(workspace));
 connectWS();
 logExec("Interface ready. Build your block sequence and click Execute.", "text-gray-500");

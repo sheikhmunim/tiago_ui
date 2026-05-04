@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>tiago_vision</name>
+  <version>0.1.0</version>
+  <description>
+    Vision node for TiaGo robot — object detection and 3D localization.
+    Subscribes to RGB image and depth point cloud from Xtion camera.
+    Publishes detected objects with 3D positions to /detected_objects.
+  </description>
+
+  <maintainer email="sheikh00munim@gmail.com">Sheikh Abdul Munim</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- ROS communication -->
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+
+  <!-- Image pipeline -->
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+
+  <!-- 3D / point cloud -->
+  <depend>pcl_ros</depend>
+  <depend>pcl_conversions</depend>
+
+  <!-- Coordinate transforms -->
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <!--
+    RESEARCH: detection backend — pick one:
+      darknet_ros  : classic YOLO, good ROS integration
+      tensorrt_ros : if TiaGo has a GPU (Jetson etc.)
+      onnxruntime  : portable, CPU/GPU, no extra ROS pkg needed
+  -->
+
+</package>
