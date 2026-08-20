@@ -96,6 +96,9 @@ const cameraImg     = document.getElementById("camera-img");
 const noCamera      = document.getElementById("no-camera");
 const rosBridgeBtn  = document.getElementById("btn-rosbridge");
 const rosStatus     = document.getElementById("ros-status");
+const radarHud      = document.getElementById("radar-hud");
+const radarCanvas   = document.getElementById("radar-canvas");
+const radarCtx      = radarCanvas.getContext("2d");
 
 // ---------------------------------------------------------------------------
 // Safety state → UI
@@ -118,6 +121,8 @@ function updateSafetyUI(state, min_dist) {
   safetyDist.textContent  = (style.dist && min_dist != null)
     ? `${min_dist.toFixed(2)} m`
     : "";
+
+  radarHud.className = `radar-hud state-${state.toLowerCase()}`;
 
   // Play audio cue on WARNING
   if (state === "WARNING" && currentSafetyState !== "WARNING") {
@@ -324,6 +329,9 @@ function connectWS() {
         cameraImg.classList.remove("hidden");
         noCamera.classList.add("hidden");
         break;
+      case "scan":
+        latestScan = data;
+        break;
     }
   };
 
@@ -333,6 +341,7 @@ function connectWS() {
     updateSafetyUI("DISCONNECTED", null);
     cameraImg.classList.add("hidden");
     noCamera.classList.remove("hidden");
+    latestScan = null;
     setTimeout(connectWS, wsReconnectDelay);
     wsReconnectDelay = Math.min(wsReconnectDelay * 2, 10000);
   };
@@ -351,6 +360,108 @@ cameraImg.addEventListener("error", () => {
   cameraImg.classList.add("hidden");
   noCamera.classList.remove("hidden");
 });
+
+// ---------------------------------------------------------------------------
+// Radar HUD — corner LIDAR minimap. Purely a visual aid: point colours mirror
+// the same WARN_DIST/STOP_DIST thresholds backend/safety.py uses, so the
+// radar never disagrees with the safety bar it sits next to.
+// ---------------------------------------------------------------------------
+const RADAR_WARN_DIST = 1.0;  // metres — must match backend/safety.py WARN_DIST
+const RADAR_STOP_DIST = 0.5;  // metres — must match backend/safety.py STOP_DIST
+const RADAR_MAX_RANGE = 2.0;  // metres — points beyond this aren't drawn
+const RADAR_RING_STEP = 0.5;  // metres between grid rings (so STOP/WARN land exactly on a ring)
+const RADAR_SIZE      = 280;  // px, matches the #radar-canvas width/height
+const RADAR_CENTER    = RADAR_SIZE / 2;
+const RADAR_RADIUS    = RADAR_CENTER - 14;
+
+let latestScan = null;
+let radarSweepAngle = 0;
+
+function radarPointColor(dist) {
+  if (dist <= RADAR_STOP_DIST) return "#ef4444";
+  if (dist <= RADAR_WARN_DIST) return "#fbbf24";
+  return "#34d399";
+}
+
+function drawRadar() {
+  const ctx = radarCtx;
+  ctx.clearRect(0, 0, RADAR_SIZE, RADAR_SIZE);
+
+  // Graph-paper grid rings every RADAR_RING_STEP metres out to max range —
+  // STOP_DIST/WARN_DIST land exactly on a ring and are highlighted in their
+  // threshold colour, the rest are plain faint grid lines.
+  ctx.lineWidth = 1;
+  for (let ringDist = RADAR_RING_STEP; ringDist <= RADAR_MAX_RANGE + 0.001; ringDist += RADAR_RING_STEP) {
+    const r = (ringDist / RADAR_MAX_RANGE) * RADAR_RADIUS;
+    ctx.strokeStyle =
+      Math.abs(ringDist - RADAR_STOP_DIST) < 0.01 ? "rgba(239, 68, 68, 0.45)" :
+      Math.abs(ringDist - RADAR_WARN_DIST) < 0.01 ? "rgba(251, 191, 36, 0.45)" :
+      "rgba(34, 211, 238, 0.18)";
+    ctx.beginPath();
+    ctx.arc(RADAR_CENTER, RADAR_CENTER, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Graph-style crosshair axis + bearing spokes every 45°, like a classic
+  // radar/sonar graticule.
+  ctx.strokeStyle = "rgba(34, 211, 238, 0.18)";
+  ctx.lineWidth = 1;
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+    ctx.beginPath();
+    ctx.moveTo(RADAR_CENTER, RADAR_CENTER);
+    ctx.lineTo(RADAR_CENTER + Math.cos(a) * RADAR_RADIUS, RADAR_CENTER + Math.sin(a) * RADAR_RADIUS);
+    ctx.stroke();
+  }
+
+  // Rotating sweep — cosmetic only, not tied to real data.
+  radarSweepAngle = (radarSweepAngle + 0.03) % (Math.PI * 2);
+  const sweepGradient = ctx.createConicGradient
+    ? ctx.createConicGradient(radarSweepAngle - Math.PI / 6, RADAR_CENTER, RADAR_CENTER)
+    : null;
+  if (sweepGradient) {
+    sweepGradient.addColorStop(0,    "rgba(34, 211, 238, 0)");
+    sweepGradient.addColorStop(0.08, "rgba(34, 211, 238, 0.35)");
+    sweepGradient.addColorStop(0.09, "rgba(34, 211, 238, 0)");
+    sweepGradient.addColorStop(1,    "rgba(34, 211, 238, 0)");
+    ctx.fillStyle = sweepGradient;
+    ctx.beginPath();
+    ctx.arc(RADAR_CENTER, RADAR_CENTER, RADAR_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Obstacle points from the latest scan.
+  if (latestScan) {
+    const { angle_min, angle_increment, ranges } = latestScan;
+    for (let i = 0; i < ranges.length; i++) {
+      const dist = ranges[i];
+      if (dist == null || !isFinite(dist) || dist > RADAR_MAX_RANGE) continue;
+
+      const angle       = angle_min + i * angle_increment;
+      const forward      = Math.cos(angle) * dist;
+      const left         = Math.sin(angle) * dist;
+      const scale        = RADAR_RADIUS / RADAR_MAX_RANGE;
+      const x            = RADAR_CENTER - left * scale;
+      const y            = RADAR_CENTER - forward * scale;
+
+      ctx.fillStyle = radarPointColor(dist);
+      ctx.beginPath();
+      ctx.arc(x, y, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Robot marker — small triangle at center, pointing "forward" (up).
+  ctx.fillStyle = "#e5e7eb";
+  ctx.beginPath();
+  ctx.moveTo(RADAR_CENTER, RADAR_CENTER - 11);
+  ctx.lineTo(RADAR_CENTER - 9, RADAR_CENTER + 9);
+  ctx.lineTo(RADAR_CENTER + 9, RADAR_CENTER + 9);
+  ctx.closePath();
+  ctx.fill();
+
+  requestAnimationFrame(drawRadar);
+}
+requestAnimationFrame(drawRadar);
 
 // ---------------------------------------------------------------------------
 // Utilities
