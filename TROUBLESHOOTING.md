@@ -315,3 +315,8 @@ Browser  ──WebSocket──▶  FastAPI backend (:8000)
 - **No rospy** in the backend — avoids all ROS networking/IP issues
 - **No roslibpy** — avoids Twisted/asyncio conflicts
 - **Pure websockets** — asyncio-native, clean integration with FastAPI
+
+
+
+
+## https://colab.research.google.com/drive/1-yZg6hFg27uCPSycRCRtyezHhq_VAHxQ?usp=sharing#scrollTo=71wR2PxM5pfF

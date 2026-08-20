@@ -1,0 +1,19 @@
+<launch>
+
+  <!-- RESEARCH: if running on TiaGo directly, this launch file runs on the robot.
+       If running on the lab computer, make sure ROS_MASTER_URI points to bandit. -->
+
+  <node pkg="tiago_vision" type="vision_node" name="tiago_vision" output="screen">
+
+    <!-- Load params from config file -->
+    <rosparam file="$(find tiago_vision)/config/params.yaml" command="load" />
+
+    <!-- Override individual params here if needed -->
+    <!-- <param name="conf_threshold" value="0.6" /> -->
+
+  </node>
+
+  <!-- RESEARCH: optionally launch rviz for visualising detections during development -->
+  <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find tiago_vision)/config/vision.rviz" /> -->
+
+</launch>

@@ -5,6 +5,15 @@
 # ─────────────────────────────────────────────────────────────────
 set -e
 
+cleanup() {
+  echo ""
+  echo "Shutting down..."
+  kill "$APP_PID" 2>/dev/null
+  wait "$APP_PID" 2>/dev/null
+  exit 0
+}
+trap cleanup INT TERM EXIT
+
 source /opt/ros/noetic/setup.bash
 
 # Always connect to the robot
@@ -15,8 +24,18 @@ export ROS_IP=$(hostname -I | tr ' ' '\n' | grep '^10\.234\.' | head -1)
 echo "ROS_MASTER_URI : $ROS_MASTER_URI"
 echo "ROS_IP         : $ROS_IP"
 
-if ! (echo > /dev/tcp/bandit/22) &>/dev/null 2>&1; then
+if ! timeout 2 bash -c 'echo > /dev/tcp/bandit/22' &>/dev/null 2>&1; then
   echo "⚠ Robot not reachable — rospy will keep retrying until it comes online."
+fi
+
+# Kill any stale instance on port 8000
+OLD_PID=$(awk '$2=="00000000:1F40" && $4=="0A" {print $10}' /proc/net/tcp 2>/dev/null | \
+  xargs -I{} grep -rl "socket:\[{}\]" /proc/[0-9]*/fd 2>/dev/null | \
+  grep -oP '(?<=/proc/)\d+' | head -1)
+if [ -n "$OLD_PID" ]; then
+  echo "Killing stale process on port 8000 (PID $OLD_PID)..."
+  kill -9 "$OLD_PID" 2>/dev/null || true
+  sleep 0.5
 fi
 
 echo ""
@@ -27,7 +46,9 @@ echo ""
 
 cd "$(dirname "$0")/backend"
 
-exec python3 -m uvicorn main:app \
+python3 -m uvicorn main:app \
   --host 0.0.0.0 \
   --port 8000 \
-  --log-level info
+  --log-level info &
+APP_PID=$!
+wait "$APP_PID"

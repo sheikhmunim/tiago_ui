@@ -1,5 +1,5 @@
 """
-Launches and monitors ROS services (rosbridge, web_video_server) as subprocesses.
+Launches and monitors ROS services (rosbridge) as subprocesses.
 Streams stdout/stderr back via a broadcast callback.
 """
 from __future__ import annotations
@@ -12,7 +12,6 @@ log = logging.getLogger(__name__)
 
 SERVICES: Dict[str, str] = {
     "rosbridge": "sshpass -p pal ssh -o StrictHostKeyChecking=no pal@10.234.6.53 \"source /opt/ros/noetic/setup.bash && source /opt/pal/gallium/setup.bash && rosservice call /pal_startup_startup_extras/start '{app: rosbridge}'\"",
-    "web_video_server": "rosrun web_video_server web_video_server",
 }
 
 

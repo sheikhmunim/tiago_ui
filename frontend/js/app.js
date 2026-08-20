@@ -10,9 +10,9 @@ const WS_URL      = `ws://${location.host}/ws`;
 const EXECUTE_URL = `${location.origin}/execute`;
 const ABORT_URL   = `${location.origin}/abort`;
 
-// Camera feed served directly from robot via web_video_server
-const CAMERA_TOPIC  = "/xtion/rgb/image_raw";
-const CAMERA_URL    = `http://bandit:8080/stream?topic=${CAMERA_TOPIC}&type=mjpeg`;
+// Camera feed streamed as JPEG frames over the app's own WebSocket, relayed
+// from rosbridge (which runs on the robot, so no cross-host video pipeline
+// is needed — see backend/ros_interface.py CAMERA_TOPIC).
 
 // ---------------------------------------------------------------------------
 // Blockly workspace
@@ -58,6 +58,7 @@ const workspace = Blockly.inject("blockly-div", {
   trashcan: true,
   zoom: { controls: true, wheel: true, startScale: 1.0 },
   theme: Blockly.Themes.Dark,
+  renderer: 'zelos',
 });
 
 // ---------------------------------------------------------------------------
@@ -74,7 +75,6 @@ const launchLog     = document.getElementById("launch-log");
 const cameraImg     = document.getElementById("camera-img");
 const noCamera      = document.getElementById("no-camera");
 const rosBridgeBtn  = document.getElementById("btn-rosbridge");
-const videoSrvBtn   = document.getElementById("btn-video-server");
 const rosStatus     = document.getElementById("ros-status");
 
 // ---------------------------------------------------------------------------
@@ -161,24 +161,11 @@ function logLaunch(service, line, level = "info") {
 // ---------------------------------------------------------------------------
 function updateServiceStatus(services) {
   const rb = services["rosbridge"] || false;
-  const vs = services["web_video_server"] || false;
 
   rosBridgeBtn.textContent = rb ? "● ROSBridge" : "○ ROSBridge";
   rosBridgeBtn.className   = rb
     ? "px-3 py-1 rounded text-sm font-mono bg-green-700 hover:bg-green-800"
     : "px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500";
-
-  videoSrvBtn.textContent  = vs ? "● Video Server" : "○ Video Server";
-  videoSrvBtn.className    = vs
-    ? "px-3 py-1 rounded text-sm font-mono bg-green-700 hover:bg-green-800"
-    : "px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500";
-
-  // Update camera src when video server comes up
-  if (vs) {
-    cameraImg.src = CAMERA_URL;
-    cameraImg.classList.remove("hidden");
-    noCamera.classList.add("hidden");
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +269,11 @@ function connectWS() {
       case "service_status":
         updateServiceStatus(data.services);
         break;
+      case "camera_frame":
+        cameraImg.src = `data:image/jpeg;base64,${data.data}`;
+        cameraImg.classList.remove("hidden");
+        noCamera.classList.add("hidden");
+        break;
     }
   };
 
@@ -289,6 +281,8 @@ function connectWS() {
     rosStatus.textContent = "○ Disconnected";
     rosStatus.className   = "text-red-400 font-mono text-sm";
     updateSafetyUI("DISCONNECTED", null);
+    cameraImg.classList.add("hidden");
+    noCamera.classList.remove("hidden");
     setTimeout(connectWS, wsReconnectDelay);
     wsReconnectDelay = Math.min(wsReconnectDelay * 2, 10000);
   };
@@ -300,11 +294,6 @@ function connectWS() {
 rosBridgeBtn.addEventListener("click", () => {
   const running = rosBridgeBtn.textContent.startsWith("●");
   ws.send(JSON.stringify({ type: running ? "stop_service" : "launch", service: "rosbridge" }));
-});
-
-videoSrvBtn.addEventListener("click", () => {
-  const running = videoSrvBtn.textContent.startsWith("●");
-  ws.send(JSON.stringify({ type: running ? "stop_service" : "launch", service: "web_video_server" }));
 });
 
 // Camera image error → show placeholder
@@ -338,7 +327,33 @@ function playBeep(freq, duration) {
 }
 
 // ---------------------------------------------------------------------------
+// Fix: preserve scroll position when blocks are added from the flyout.
+// Blockly can reset the workspace viewport after flyout closes, making
+// previously placed blocks scroll off-screen ("vanish").
+// ---------------------------------------------------------------------------
+(function () {
+  let scrollX = 0;
+  let scrollY = 0;
+
+  // Capture scroll before the flyout interaction
+  workspace.addChangeListener(function (event) {
+    if (event.type === Blockly.Events.BLOCK_CREATE) {
+      // Restore the scroll position the user had before clicking the flyout
+      workspace.scroll(scrollX, scrollY);
+    } else if (
+      event.type !== Blockly.Events.BLOCK_DRAG &&
+      event.type !== Blockly.Events.SELECTED
+    ) {
+      // Keep tracking current scroll so we can restore it
+      scrollX = workspace.scrollX;
+      scrollY = workspace.scrollY;
+    }
+  });
+})();
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+window.addEventListener("resize", () => Blockly.svgResize(workspace));
 connectWS();
 logExec("Interface ready. Build your block sequence and click Execute.", "text-gray-500");

@@ -1,0 +1,18 @@
+# Vision node parameters
+# Set these before launching
+
+# Path to YOLO model weights
+# RESEARCH: download YOLOv8 ONNX or darknet weights and put the path here
+# e.g. /home/user/models/yolov8n.onnx
+model_path: "/tiago_ui/models/yolov8n.onnx"
+
+# Detection confidence threshold (0.0 – 1.0)
+# Lower = more detections but more false positives
+conf_threshold: 0.5
+
+# TF frame to express 3D positions in
+# RESEARCH: options on TiaGo:
+#   base_footprint : relative to robot base (no SLAM needed, simplest)
+#   odom           : relative to start position
+#   map            : absolute (needs navigation stack + SLAM)
+target_frame: "base_footprint"

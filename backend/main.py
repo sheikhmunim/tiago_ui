@@ -67,6 +67,17 @@ executor = BlockExecutor(ros, safety, manager.broadcast)
 launcher = ServiceLauncher(manager.broadcast)
 
 
+def _on_camera_frame(msg: Dict[str, Any]):
+    # msg["data"] is already base64-encoded JPEG bytes (rosbridge JSON convention)
+    asyncio.create_task(manager.broadcast({
+        "type": "camera_frame",
+        "data": msg.get("data", ""),
+    }))
+
+
+ros.add_camera_callback(_on_camera_frame)
+
+
 # ---------------------------------------------------------------------------
 # Background tasks
 # ---------------------------------------------------------------------------
