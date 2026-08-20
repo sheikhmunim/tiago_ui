@@ -53,6 +53,26 @@
       clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
     }
 
+    /* ── Responsive sizing — camera / detection / radar all share the
+       sidebar's available height equally (flex:1 each) instead of camera
+       and detection being fixed-size and radar absorbing whatever's left.
+       Each panel's actual content (img via object-contain, canvas via
+       container-query cqmin sizing) fits whatever box flex gives it,
+       so nothing overflows or clips regardless of screen size. ── */
+    .sidebar-col        { width: 360px; }
+    .sidebar-panel-top  { margin: 8px; margin-bottom: 0; }
+    .sidebar-panel-last { margin: 8px; }
+    .sidebar-flex-panel { flex: 1; min-height: 150px; }
+    .execlog-row        { height: 140px; }
+
+    @media (max-height: 820px), (max-width: 1366px) {
+      .sidebar-col        { width: 240px; }
+      .sidebar-panel-top  { margin: 5px; margin-bottom: 0; }
+      .sidebar-panel-last { margin: 5px; }
+      .sidebar-flex-panel { min-height: 90px; }
+      .execlog-row        { height: 90px; }
+    }
+
     .console-btn {
       font-family: 'Orbitron', 'Share Tech Mono', monospace;
       letter-spacing: 0.08em;
@@ -217,10 +237,15 @@
 
     /* ── Radar HUD — live LIDAR minimap, sits in the right sidebar.
        Border glow colour mirrors currentSafetyState, set via app.js. ── */
+    /* .radar-cq establishes a size container so .radar-hud can size itself
+       to the *actual* available box (both width and height) via container
+       query units — not a guessed fixed px value per breakpoint. cqmin picks
+       the smaller of the container's width/height, so the circle always
+       fits both dimensions without ever overflowing/clipping. */
+    .radar-cq { container-type: size; }
     .radar-hud {
-      width: 280px;
-      height: 280px;
-      max-width: 100%;
+      width: min(100cqmin, 280px);
+      height: min(100cqmin, 280px);
       border-radius: 50%;
       background: rgba(5, 7, 13, 0.72);
       border: 1px solid var(--sf-border);
@@ -266,14 +291,14 @@
     <!-- Left: Blockly workspace -->
     <div id="blockly-div" style="flex:1; min-width:0; position:relative;"></div>
     <!-- Right panel -->
-    <div style="width:360px; display:flex; flex-direction:column; overflow-y:auto; border-left:1px solid rgba(34,211,238,0.25); background:rgba(5,7,13,0.6);">
+    <div class="sidebar-col" style="display:flex; flex-direction:column; overflow-y:auto; border-left:1px solid rgba(34,211,238,0.25); background:rgba(5,7,13,0.6);">
 
       <!-- Raw camera feed -->
-      <div class="console-panel" style="margin:8px; margin-bottom:0; flex-shrink:0;">
-        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900">
+      <div class="console-panel sidebar-panel-top sidebar-flex-panel" style="display:flex; flex-direction:column;">
+        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900 flex-shrink-0">
           RAW CAMERA FEED
         </div>
-        <div style="aspect-ratio:4/3; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <div style="flex:1; min-height:0; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
           <img id="camera-img"
                class="hidden max-w-full max-h-full object-contain"
                alt="Robot camera" />
@@ -286,11 +311,11 @@
       </div>
 
       <!-- Detection feed (placeholder — vision node not yet wired to the UI) -->
-      <div class="console-panel" style="margin:8px; margin-bottom:0; flex-shrink:0;">
-        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900">
+      <div class="console-panel sidebar-panel-top sidebar-flex-panel" style="display:flex; flex-direction:column;">
+        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900 flex-shrink-0">
           DETECTION FEED
         </div>
-        <div style="aspect-ratio:4/3; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <div style="flex:1; min-height:0; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
           <div class="text-gray-500 text-sm text-center px-4">
             <div class="text-4xl mb-2">🎯</div>
             <div class="console-label">Detection feed not connected</div>
@@ -300,11 +325,11 @@
       </div>
 
       <!-- Radar HUD — live LIDAR minimap -->
-      <div class="console-panel" style="flex:1; min-height:150px; margin:8px; display:flex; flex-direction:column;">
+      <div class="console-panel sidebar-panel-last sidebar-flex-panel" style="display:flex; flex-direction:column;">
         <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900 flex-shrink-0">
           LIDAR RADAR
         </div>
-        <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:8px;">
+        <div class="radar-cq" style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:8px; min-width:0; min-height:0;">
           <div id="radar-hud" class="radar-hud">
             <canvas id="radar-canvas" width="280" height="280"></canvas>
           </div>
@@ -337,7 +362,7 @@
     </div>
 
     <!-- Execution log row -->
-    <div class="px-3 py-2 border-b border-cyan-900" style="display:flex; flex-direction:column; height:140px;">
+    <div class="px-3 py-2 border-b border-cyan-900 execlog-row" style="display:flex; flex-direction:column;">
       <div class="console-label text-xs text-cyan-400 mb-1 flex-shrink-0">EXECUTION LOG</div>
       <div id="exec-log"
            class="flex-1 overflow-y-auto font-mono text-xs leading-relaxed bg-black bg-opacity-40 rounded px-2 py-1 border border-cyan-900"
