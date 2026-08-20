@@ -34,6 +34,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip3 install ultralytics opencv-python
+
 
 # Install vision node dependencies
 RUN apt-get update && apt-get install -y \
@@ -65,6 +67,9 @@ RUN cd /tmp && \
 # Install Python backend dependencies (system-wide so uvicorn is on PATH)
 RUN pip3 install --system fastapi "uvicorn[standard]" 2>/dev/null || \
     pip3 install fastapi "uvicorn[standard]"
+
+
+
 
 # Switch to non-root user
 USER $USERNAME
