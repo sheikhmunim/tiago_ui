@@ -12,7 +12,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -78,12 +78,36 @@ def _on_camera_frame(msg: Dict[str, Any]):
 ros.add_camera_callback(_on_camera_frame)
 
 
+# Radar HUD: cache the latest scan (downsampled) for the safety_broadcast_loop
+# to push at 5 Hz — separate from safety.py's own full-resolution, full-rate
+# subscription, so the browser-facing radar can't affect stop-distance timing.
+MAX_SCAN_POINTS = 180
+_latest_scan: Optional[Dict[str, Any]] = None
+
+
+def _on_scan_frame(msg: Dict[str, Any]):
+    global _latest_scan
+    ranges = msg.get("ranges", [])
+    step = max(1, len(ranges) // MAX_SCAN_POINTS)
+    _latest_scan = {
+        "angle_min":       msg.get("angle_min", 0.0),
+        "angle_increment": msg.get("angle_increment", 0.0) * step,
+        "range_min":       msg.get("range_min", 0.0),
+        "range_max":       msg.get("range_max", 0.0),
+        "ranges":          ranges[::step],
+    }
+
+
+ros.add_scan_callback(_on_scan_frame)
+
+
 # ---------------------------------------------------------------------------
 # Background tasks
 # ---------------------------------------------------------------------------
 
 async def safety_broadcast_loop():
-    """Push safety state to all clients at 5 Hz."""
+    """Push safety state and a downsampled LIDAR scan (for the radar HUD) to
+    all clients at 5 Hz."""
     while True:
         await manager.broadcast({
             "type": "safety",
@@ -91,6 +115,8 @@ async def safety_broadcast_loop():
             "min_dist": safety.min_dist,
             "ros_ready": ros.is_ready,
         })
+        if _latest_scan is not None:
+            await manager.broadcast({"type": "scan", **_latest_scan})
         await asyncio.sleep(0.2)
 
 

@@ -214,6 +214,24 @@
       0%, 100% { filter: drop-shadow(0 0 3px var(--sf-cyan)) drop-shadow(0 0 6px var(--sf-cyan)); }
       50%      { filter: drop-shadow(0 0 8px var(--sf-cyan)) drop-shadow(0 0 16px var(--sf-cyan)); }
     }
+
+    /* ── Radar HUD — live LIDAR minimap, sits in the right sidebar.
+       Border glow colour mirrors currentSafetyState, set via app.js. ── */
+    .radar-hud {
+      width: 280px;
+      height: 280px;
+      max-width: 100%;
+      border-radius: 50%;
+      background: rgba(5, 7, 13, 0.72);
+      border: 1px solid var(--sf-border);
+      box-shadow: 0 0 16px rgba(34, 211, 238, 0.25), inset 0 0 20px rgba(34, 211, 238, 0.08);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .radar-hud canvas { display: block; width: 100%; height: 100%; }
+    .radar-hud.state-clear    { border-color: #34d399; box-shadow: 0 0 16px rgba(52,211,153,0.35), inset 0 0 20px rgba(52,211,153,0.1); }
+    .radar-hud.state-warning  { border-color: #fbbf24; box-shadow: 0 0 16px rgba(251,191,36,0.35), inset 0 0 20px rgba(251,191,36,0.1); }
+    .radar-hud.state-danger   { border-color: #ef4444; box-shadow: 0 0 16px rgba(239,68,68,0.4),  inset 0 0 20px rgba(239,68,68,0.12); }
+    .radar-hud.state-disconnected { border-color: #64748b; box-shadow: 0 0 12px rgba(100,116,139,0.25); }
   </style>
 </head>
 <body class="text-white" style="display:flex; flex-direction:column; height:100vh;">
@@ -281,13 +299,15 @@
         </div>
       </div>
 
-      <!-- Execution log -->
-      <div class="console-panel" style="flex:1; min-height:120px; margin:8px; display:flex; flex-direction:column;">
+      <!-- Radar HUD — live LIDAR minimap -->
+      <div class="console-panel" style="flex:1; min-height:150px; margin:8px; display:flex; flex-direction:column;">
         <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900 flex-shrink-0">
-          EXECUTION LOG
+          LIDAR RADAR
         </div>
-        <div id="exec-log"
-             class="flex-1 overflow-y-auto px-2 py-1 font-mono text-xs leading-relaxed">
+        <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:8px;">
+          <div id="radar-hud" class="radar-hud">
+            <canvas id="radar-canvas" width="280" height="280"></canvas>
+          </div>
         </div>
       </div>
 
@@ -313,6 +333,15 @@
            class="flex-1 overflow-x-auto overflow-y-auto font-mono text-xs text-gray-400 bg-black bg-opacity-40 rounded px-2 py-1 border border-cyan-900"
            style="max-height:36px; white-space:nowrap;">
         <span class="text-gray-600">Click a service button to start it…</span>
+      </div>
+    </div>
+
+    <!-- Execution log row -->
+    <div class="px-3 py-2 border-b border-cyan-900" style="display:flex; flex-direction:column; height:140px;">
+      <div class="console-label text-xs text-cyan-400 mb-1 flex-shrink-0">EXECUTION LOG</div>
+      <div id="exec-log"
+           class="flex-1 overflow-y-auto font-mono text-xs leading-relaxed bg-black bg-opacity-40 rounded px-2 py-1 border border-cyan-900"
+           style="min-height:0;">
       </div>
     </div>
 
