@@ -10,9 +10,9 @@ const WS_URL      = `ws://${location.host}/ws`;
 const EXECUTE_URL = `${location.origin}/execute`;
 const ABORT_URL   = `${location.origin}/abort`;
 
-// Camera feed served directly from robot via web_video_server
-const CAMERA_TOPIC  = "/xtion/rgb/image_raw";
-const CAMERA_URL    = `http://bandit:8080/stream?topic=${CAMERA_TOPIC}&type=mjpeg`;
+// Camera feed streamed as JPEG frames over the app's own WebSocket, relayed
+// from rosbridge (which runs on the robot, so no cross-host video pipeline
+// is needed — see backend/ros_interface.py CAMERA_TOPIC).
 
 // ---------------------------------------------------------------------------
 // Blockly workspace
@@ -75,7 +75,6 @@ const launchLog     = document.getElementById("launch-log");
 const cameraImg     = document.getElementById("camera-img");
 const noCamera      = document.getElementById("no-camera");
 const rosBridgeBtn  = document.getElementById("btn-rosbridge");
-const videoSrvBtn   = document.getElementById("btn-video-server");
 const rosStatus     = document.getElementById("ros-status");
 
 // ---------------------------------------------------------------------------
@@ -162,24 +161,11 @@ function logLaunch(service, line, level = "info") {
 // ---------------------------------------------------------------------------
 function updateServiceStatus(services) {
   const rb = services["rosbridge"] || false;
-  const vs = services["web_video_server"] || false;
 
   rosBridgeBtn.textContent = rb ? "● ROSBridge" : "○ ROSBridge";
   rosBridgeBtn.className   = rb
     ? "px-3 py-1 rounded text-sm font-mono bg-green-700 hover:bg-green-800"
     : "px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500";
-
-  videoSrvBtn.textContent  = vs ? "● Video Server" : "○ Video Server";
-  videoSrvBtn.className    = vs
-    ? "px-3 py-1 rounded text-sm font-mono bg-green-700 hover:bg-green-800"
-    : "px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500";
-
-  // Update camera src when video server comes up
-  if (vs) {
-    cameraImg.src = CAMERA_URL;
-    cameraImg.classList.remove("hidden");
-    noCamera.classList.add("hidden");
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +269,11 @@ function connectWS() {
       case "service_status":
         updateServiceStatus(data.services);
         break;
+      case "camera_frame":
+        cameraImg.src = `data:image/jpeg;base64,${data.data}`;
+        cameraImg.classList.remove("hidden");
+        noCamera.classList.add("hidden");
+        break;
     }
   };
 
@@ -290,6 +281,8 @@ function connectWS() {
     rosStatus.textContent = "○ Disconnected";
     rosStatus.className   = "text-red-400 font-mono text-sm";
     updateSafetyUI("DISCONNECTED", null);
+    cameraImg.classList.add("hidden");
+    noCamera.classList.remove("hidden");
     setTimeout(connectWS, wsReconnectDelay);
     wsReconnectDelay = Math.min(wsReconnectDelay * 2, 10000);
   };
@@ -301,11 +294,6 @@ function connectWS() {
 rosBridgeBtn.addEventListener("click", () => {
   const running = rosBridgeBtn.textContent.startsWith("●");
   ws.send(JSON.stringify({ type: running ? "stop_service" : "launch", service: "rosbridge" }));
-});
-
-videoSrvBtn.addEventListener("click", () => {
-  const running = videoSrvBtn.textContent.startsWith("●");
-  ws.send(JSON.stringify({ type: running ? "stop_service" : "launch", service: "web_video_server" }));
 });
 
 // Camera image error → show placeholder
