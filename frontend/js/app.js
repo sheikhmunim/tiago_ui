@@ -52,12 +52,32 @@ const toolbox = {
   ]
 };
 
+// Blockly.Themes.Dark doesn't exist in this Blockly build (only Classic and
+// Zelos ship) — defining our own so the workspace matches the console theme
+// instead of silently falling back to the stock white "classic" background.
+const scifiBlocklyTheme = Blockly.Theme.defineTheme('scifi-console', {
+  base: Blockly.Themes.Classic,
+  componentStyles: {
+    workspaceBackgroundColour: '#05070d',
+    toolboxBackgroundColour: '#070c16',
+    toolboxForegroundColour: '#ffffff',
+    flyoutBackgroundColour: '#070c16',
+    flyoutForegroundColour: '#e5e7eb',
+    flyoutOpacity: 0.96,
+    scrollbarColour: '#0e7490',
+    scrollbarOpacity: 0.6,
+    insertionMarkerColour: '#22d3ee',
+    insertionMarkerOpacity: 0.4,
+    cursorColour: '#22d3ee',
+  },
+});
+
 const workspace = Blockly.inject("blockly-div", {
   toolbox,
   scrollbars: true,
   trashcan: true,
   zoom: { controls: true, wheel: true, startScale: 1.0 },
-  theme: Blockly.Themes.Dark,
+  theme: scifiBlocklyTheme,
   renderer: 'zelos',
 });
 
@@ -119,25 +139,53 @@ function logExec(msg, cls = "text-gray-300") {
   execLog.scrollTop = execLog.scrollHeight;
 }
 
+// ---------------------------------------------------------------------------
+// Block execution highlighting — mirrors backend "running"/"step_done"
+// events onto the actual Blockly block instance (via its id), so the
+// operator can see exactly which block is live, including inside if_else
+// branches (backend broadcasts both the wrapper and its active child).
+// ---------------------------------------------------------------------------
+const highlightedBlockIds = new Set();
+
+function setBlockHighlighted(id, on) {
+  if (!id) return;
+  const block = workspace.getBlockById(id);
+  if (!block) return;
+  // Blockly's built-in setHighlighted() applies a non-restylable SVG emboss
+  // filter, so we drive our own glow via a CSS class on the block's SVG root.
+  block.getSvgRoot().classList.toggle("exec-highlight", on);
+  if (on) highlightedBlockIds.add(id);
+  else highlightedBlockIds.delete(id);
+}
+
+function clearAllHighlights() {
+  for (const id of [...highlightedBlockIds]) setBlockHighlighted(id, false);
+}
+
 function handleExecutionMsg(data) {
-  const { status, step, total, block, reason, message } = data;
+  const { status, step, total, block, id, reason, message } = data;
   switch (status) {
     case "running":
       logExec(`▶ Step ${step}/${total}: ${block}`, "text-blue-300");
+      setBlockHighlighted(id, true);
       break;
     case "step_done":
       logExec(`✔ Step ${step}/${total} done`, "text-green-400");
+      setBlockHighlighted(id, false);
       break;
     case "completed":
       logExec("✔ Sequence completed.", "text-green-300 font-bold");
+      clearAllHighlights();
       setExecuting(false);
       break;
     case "aborted":
       logExec(`✖ Aborted at step ${step}/${total} — ${reason || ""}`, "text-red-400");
+      clearAllHighlights();
       setExecuting(false);
       break;
     case "error":
       logExec(`✖ Error: ${message}`, "text-red-500");
+      clearAllHighlights();
       setExecuting(false);
       break;
   }
@@ -221,10 +269,12 @@ async function sendAbort() {
 eStopBtn.addEventListener("click", () => {
   sendAbort();
   logExec("⬛ EMERGENCY STOP pressed.", "text-red-300 font-bold");
+  clearAllHighlights();
   setExecuting(false);
 });
 
 clearBtn.addEventListener("click", () => {
+  highlightedBlockIds.clear();
   workspace.clear();
   execLog.innerHTML = "";
 });
