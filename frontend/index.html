@@ -11,79 +11,145 @@
   <!-- Blockly CDN -->
   <script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
 
-  <style>
-    html, body { height: 100%; margin: 0; overflow: hidden; }
+  <!-- Console fonts: Orbitron for headers/labels, Share Tech Mono for data/logs -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-    #blockly-div {
-      width: 100%;
-      height: 100%;
+  <style>
+    :root {
+      --sf-bg:        #05070d;
+      --sf-panel:     rgba(9, 16, 28, 0.82);
+      --sf-panel-lt:  rgba(14, 24, 40, 0.85);
+      --sf-border:    rgba(34, 211, 238, 0.35);
+      --sf-border-lt: rgba(34, 211, 238, 0.6);
+      --sf-cyan:      #22d3ee;
+      --sf-cyan-dim:  #0e7490;
+      --sf-amber:     #f59e0b;
     }
 
-    /* Override Blockly injected size */
-    /* .blocklyWidgetDiv, .blocklyDropDownDiv { z-index: 9999; } */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
 
-        /* REPLACE with this: */
+    body {
+      font-family: 'Share Tech Mono', monospace;
+      background: var(--sf-bg);
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.055) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .console-title, button, .console-label {
+      font-family: 'Orbitron', 'Share Tech Mono', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Reusable console-panel look: glowing border + angular cut corners ── */
+    .console-panel {
+      background: var(--sf-panel);
+      border: 1px solid var(--sf-border);
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.12), inset 0 0 24px rgba(34, 211, 238, 0.04);
+      backdrop-filter: blur(4px);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    }
+
+    .console-btn {
+      font-family: 'Orbitron', 'Share Tech Mono', monospace;
+      letter-spacing: 0.08em;
+      background: rgba(14, 116, 144, 0.18);
+      border: 1px solid var(--sf-border-lt);
+      color: var(--sf-cyan);
+      text-shadow: 0 0 6px rgba(34, 211, 238, 0.5);
+      transition: background-color 0.15s, box-shadow 0.15s, color 0.15s;
+    }
+    .console-btn:hover:not(:disabled) {
+      background: rgba(34, 211, 238, 0.22);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.35);
+    }
+    .console-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .console-btn-primary {
+      font-family: 'Orbitron', 'Share Tech Mono', monospace;
+      letter-spacing: 0.08em;
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.35), rgba(14, 116, 144, 0.35));
+      border: 1px solid var(--sf-cyan);
+      color: #ecfeff;
+      text-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.25);
+      transition: box-shadow 0.15s, transform 0.05s;
+    }
+    .console-btn-primary:hover:not(:disabled) { box-shadow: 0 0 18px rgba(34, 211, 238, 0.5); }
+    .console-btn-primary:active:not(:disabled) { transform: translateY(1px); }
+    .console-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Safety bar and ROSBridge button have their class list fully replaced by
+       app.js on state changes, so themed styling is anchored to their IDs
+       (which persist) rather than to classes that get overwritten. */
+    #safety-bar {
+      font-family: 'Orbitron', 'Share Tech Mono', monospace;
+      border-bottom: 1px solid var(--sf-border);
+      box-shadow: 0 0 16px rgba(34, 211, 238, 0.1);
+    }
+    #safety-bar #safety-label { letter-spacing: 0.05em; text-shadow: 0 0 6px currentColor; }
+
+    /* CLEAR / WARNING / DISCONNECTED are informational — swap Tailwind's flat
+       fill for a dark neon-on-black HUD readout instead. DANGER stays a
+       solid, undiluted red (see emergency-stop) since that's the one state
+       that must never read as decorative console chrome. */
+    #safety-bar.bg-green-700 {
+      background: linear-gradient(180deg, rgba(16,185,129,0.3), rgba(5,7,13,0.94));
+      box-shadow: inset 0 0 30px rgba(52,211,153,0.35), 0 0 18px rgba(52,211,153,0.5);
+    }
+    #safety-bar.bg-green-700 #safety-label { color: #34d399; }
+
+    #safety-bar.bg-yellow-500 {
+      background: linear-gradient(180deg, rgba(245,158,11,0.32), rgba(5,7,13,0.94));
+      box-shadow: inset 0 0 30px rgba(251,191,36,0.35), 0 0 18px rgba(251,191,36,0.5);
+    }
+    #safety-bar.bg-yellow-500 #safety-label { color: #fbbf24; }
+
+    #safety-bar.bg-red-700    { box-shadow: inset 0 0 24px rgba(239,68,68,0.3),   0 0 14px rgba(239,68,68,0.45); }
+
+    #safety-bar.bg-gray-600 {
+      background: linear-gradient(180deg, rgba(100,116,139,0.25), rgba(5,7,13,0.94));
+      box-shadow: inset 0 0 18px rgba(148,163,184,0.15);
+    }
+    #safety-bar.bg-gray-600 #safety-label { color: #94a3b8; }
+
+    #btn-rosbridge { font-family: 'Orbitron', 'Share Tech Mono', monospace; letter-spacing: 0.06em; }
+
+    /* Emergency stop intentionally left un-themed — solid red, no glow/gradient
+       reinterpretation — so it never reads as decorative console chrome. */
+
+    #blockly-div { width: 100%; height: 100%; }
+
     .blocklyWidgetDiv, .blocklyDropDownDiv { z-index: 9999; }
-
-
-
 
     /* Execution log scrollbar */
     #exec-log::-webkit-scrollbar,
     #launch-log::-webkit-scrollbar { width: 4px; }
     #exec-log::-webkit-scrollbar-thumb,
-    #launch-log::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+    #launch-log::-webkit-scrollbar-thumb { background: var(--sf-cyan-dim); border-radius: 2px; }
 
     /* Blockly toolbox category styling */
-    /* .blocklyToolboxDiv {
-      background: #111827 !important;
-      border-right: 2px solid #374151 !important;
-      padding: 8px 0 !important;
-    }
-
-    .blocklyTreeRow {
-      margin: 6px 8px !important;
-      border-radius: 8px !important;
-      padding: 10px 14px !important;
-      cursor: pointer !important;
-      transition: transform 0.1s, opacity 0.1s !important;
-    }
-
-    .blocklyTreeRow:hover {
-      transform: scale(1.03) !important;
-      opacity: 0.9 !important;
-    }
-
-    .blocklyTreeLabel {
-      font-size: 15px !important;
-      font-weight: 700 !important;
-      font-family: monospace !important;
-      letter-spacing: 0.05em !important;
-      color: #fff !important;
-      margin-left: -10px !important;
-      line-height: 1 !important;
-    }
-
-    .blocklyTreeIcon {
-      display: none !important;
-    } */
-
     .blocklyToolboxDiv {
-      background: #111827 !important;
-      border-right: 2px solid #374151 !important;
+      background: #070c16 !important;
+      border-right: 1px solid var(--sf-border) !important;
+      box-shadow: 0 0 16px rgba(34, 211, 238, 0.08);
       padding: 8px 0 !important;
       width: 200px !important;
     }
 
     .blocklyTreeRow {
       margin: 6px 8px !important;
-      border-radius: 8px !important;
+      border-radius: 4px !important;
       padding: 20px 22px !important;
       cursor: pointer !important;
-      transition: transform 0.1s, opacity 0.1s !important;
+      transition: transform 0.1s, opacity 0.1s, box-shadow 0.15s !important;
       display: flex !important;
       align-items: center !important;
-      justify-content: center !important;  /* centers text horizontally */
+      justify-content: center !important;
+      border: 1px solid transparent !important;
     }
 
     .blocklyTreeRow:hover {
@@ -94,50 +160,40 @@
     .blocklyTreeLabel {
       font-size: 15px !important;
       font-weight: 700 !important;
-      font-family: monospace !important;
+      font-family: 'Orbitron', monospace !important;
       letter-spacing: 0.05em !important;
       color: #fff !important;
     }
 
-    .blocklyTreeIcon {
-      display: none !important;
-    }
-
+    .blocklyTreeIcon { display: none !important; }
 
     /* Hide Blockly flyout scrollbar */
-    .blocklyFlyoutScrollbar {
-      display: none !important;
-    }
+    .blocklyFlyoutScrollbar { display: none !important; }
 
-    /* Or make it thinner and auto-hide */
     .blocklyScrollbarHandle {
-      fill: #374151 !important;
+      fill: var(--sf-cyan-dim) !important;
       opacity: 0 !important;
       transition: opacity 0.3s !important;
     }
+    .blocklyScrollbarHandle:hover { opacity: 1 !important; }
 
-    .blocklyScrollbarHandle:hover {
-      opacity: 1 !important;
-    }
+    .blocklyFlyoutBackground { fill: #070c16 !important; fill-opacity: 0.96 !important; }
 
-
-
-
-
-
-
-    /* Always-on category colors */
-    .blocklyTreeRow:nth-child(1) { background: #166534 !important; } /* Motion  - green  */
-    .blocklyTreeRow:nth-child(2) { background: #1e3a8a !important; } /* Control - blue   */
-    .blocklyTreeRow:nth-child(3) { background: #92400e !important; } /* Sensors - orange */
+    /* Console-palette category colors — cyan / amber / magenta HUD scheme.
+       Each .blocklyTreeRow is the sole child of its own .blocklyToolboxCategory
+       wrapper, so nth-child must be scoped to that wrapper's position among its
+       siblings under .blocklyToolboxContents — not the row itself. */
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(1) .blocklyTreeRow { background: #0e4a52 !important; border-color: rgba(34,211,238,0.4) !important; } /* Motion  - cyan   */
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(2) .blocklyTreeRow { background: #5a4408 !important; border-color: rgba(245,158,11,0.4) !important; } /* Control - amber  */
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(3) .blocklyTreeRow { background: #5a1854 !important; border-color: rgba(232,121,249,0.4) !important; } /* Sensors - magenta */
 
     /* Brighten on selected/hover */
-    .blocklyTreeRow:nth-child(1):hover,
-    .blocklyTreeSelected:nth-child(1) { background: #15803d !important; }
-    .blocklyTreeRow:nth-child(2):hover,
-    .blocklyTreeSelected:nth-child(2) { background: #1d4ed8 !important; }
-    .blocklyTreeRow:nth-child(3):hover,
-    .blocklyTreeSelected:nth-child(3) { background: #b45309 !important; }
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(1) .blocklyTreeRow:hover,
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(1) .blocklyTreeSelected { background: #15707d !important; box-shadow: 0 0 10px rgba(34,211,238,0.5) !important; }
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(2) .blocklyTreeRow:hover,
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(2) .blocklyTreeSelected { background: #8a6a0c !important; box-shadow: 0 0 10px rgba(245,158,11,0.5) !important; }
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(3) .blocklyTreeRow:hover,
+    .blocklyToolboxContents > .blocklyToolboxCategory:nth-child(3) .blocklyTreeSelected { background: #8a2680 !important; box-shadow: 0 0 10px rgba(232,121,249,0.5) !important; }
 
     /* Emergency stop pulse animation in DANGER */
     .danger-pulse { animation: pulse-red 0.8s ease-in-out infinite; }
@@ -145,9 +201,22 @@
       0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
       50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
     }
+
+    /* ── Live execution highlight — driven by app.js toggling this class on
+       the running block's SVG root (Blockly's own setHighlighted() uses a
+       fixed non-restylable emboss filter, so we roll our own glow here). ── */
+    .exec-highlight > .blocklyPath {
+      stroke: var(--sf-cyan) !important;
+      stroke-width: 3px !important;
+      animation: exec-pulse 1s ease-in-out infinite;
+    }
+    @keyframes exec-pulse {
+      0%, 100% { filter: drop-shadow(0 0 3px var(--sf-cyan)) drop-shadow(0 0 6px var(--sf-cyan)); }
+      50%      { filter: drop-shadow(0 0 8px var(--sf-cyan)) drop-shadow(0 0 16px var(--sf-cyan)); }
+    }
   </style>
 </head>
-<body class="bg-gray-900 text-white" style="display:flex; flex-direction:column; height:100vh;">
+<body class="text-white" style="display:flex; flex-direction:column; height:100vh;">
 
   <!-- ═══════════════════════════════════════════════════════════════════════
        SAFETY BAR — always on top
@@ -177,27 +246,45 @@
   <div style="display:flex; flex:1; overflow:hidden;">
 
     <!-- Left: Blockly workspace -->
-    <!-- <div id="blockly-div" style="flex:1; min-width:0;"></div> -->
     <div id="blockly-div" style="flex:1; min-width:0; position:relative;"></div>
     <!-- Right panel -->
-    <div style="width:360px; display:flex; flex-direction:column; border-left:1px solid #374151;">
+    <div style="width:360px; display:flex; flex-direction:column; overflow-y:auto; border-left:1px solid rgba(34,211,238,0.25); background:rgba(5,7,13,0.6);">
 
-      <!-- Camera feed -->
-      <div style="flex:1; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-        <img id="camera-img"
-             class="hidden max-w-full max-h-full object-contain"
-             alt="Robot camera" />
-        <div id="no-camera" class="text-gray-500 text-sm text-center px-4">
-          <div class="text-4xl mb-2">📷</div>
-          <div>Camera not connected</div>
-          <div class="text-xs mt-1 text-gray-600">Waiting for camera stream…</div>
+      <!-- Raw camera feed -->
+      <div class="console-panel" style="margin:8px; margin-bottom:0; flex-shrink:0;">
+        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900">
+          RAW CAMERA FEED
+        </div>
+        <div style="aspect-ratio:4/3; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <img id="camera-img"
+               class="hidden max-w-full max-h-full object-contain"
+               alt="Robot camera" />
+          <div id="no-camera" class="text-gray-500 text-sm text-center px-4">
+            <div class="text-4xl mb-2">📷</div>
+            <div class="console-label">Camera not connected</div>
+            <div class="text-xs mt-1 text-gray-600">Waiting for camera stream…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection feed (placeholder — vision node not yet wired to the UI) -->
+      <div class="console-panel" style="margin:8px; margin-bottom:0; flex-shrink:0;">
+        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900">
+          DETECTION FEED
+        </div>
+        <div style="aspect-ratio:4/3; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <div class="text-gray-500 text-sm text-center px-4">
+            <div class="text-4xl mb-2">🎯</div>
+            <div class="console-label">Detection feed not connected</div>
+            <div class="text-xs mt-1 text-gray-600">Vision node pending…</div>
+          </div>
         </div>
       </div>
 
       <!-- Execution log -->
-      <div style="height:200px; background:#111827; border-top:1px solid #374151; display:flex; flex-direction:column;">
-        <div class="px-2 py-1 text-xs text-gray-500 font-mono border-b border-gray-700 flex-shrink-0">
-          Execution Log
+      <div class="console-panel" style="flex:1; min-height:120px; margin:8px; display:flex; flex-direction:column;">
+        <div class="console-label px-2 py-1 text-xs text-cyan-300 border-b border-cyan-900 flex-shrink-0">
+          EXECUTION LOG
         </div>
         <div id="exec-log"
              class="flex-1 overflow-y-auto px-2 py-1 font-mono text-xs leading-relaxed">
@@ -210,20 +297,20 @@
   <!-- ═══════════════════════════════════════════════════════════════════════
        BOTTOM BAR
   ════════════════════════════════════════════════════════════════════════ -->
-  <div style="flex-shrink:0; background:#1f2937; border-top:1px solid #374151;">
+  <div style="flex-shrink:0; background:rgba(9,16,28,0.9); border-top:1px solid var(--sf-border);">
 
     <!-- Launch panel row -->
-    <div class="flex items-center gap-2 px-3 py-1 border-b border-gray-700">
-      <span class="text-xs text-gray-500 font-mono mr-1">SERVICES</span>
+    <div class="flex items-center gap-2 px-3 py-1 border-b border-cyan-900">
+      <span class="console-label text-xs text-cyan-400 mr-1">SERVICES</span>
 
       <button id="btn-rosbridge"
-              class="px-3 py-1 rounded text-sm font-mono bg-gray-600 hover:bg-gray-500">
+              class="console-btn px-3 py-1 rounded text-sm">
         ○ ROSBridge
       </button>
 
       <!-- Launch log (scrollable, inline) -->
       <div id="launch-log"
-           class="flex-1 overflow-x-auto overflow-y-auto font-mono text-xs text-gray-400 bg-gray-900 rounded px-2 py-1"
+           class="flex-1 overflow-x-auto overflow-y-auto font-mono text-xs text-gray-400 bg-black bg-opacity-40 rounded px-2 py-1 border border-cyan-900"
            style="max-height:36px; white-space:nowrap;">
         <span class="text-gray-600">Click a service button to start it…</span>
       </div>
@@ -236,11 +323,11 @@
       </div>
       <div class="flex gap-2">
         <button id="clear-btn"
-                class="px-4 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-sm font-semibold">
+                class="console-btn py-2 px-6 rounded-lg text-lg tracking-wider">
           Clear
         </button>
         <button id="execute-btn"
-                class="px-5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 active:bg-blue-800 text-sm font-bold transition-colors">
+                class="console-btn-primary py-2 px-6 rounded-lg text-lg tracking-wider w-[289px] text-center">
           ▶ Execute
         </button>
       </div>

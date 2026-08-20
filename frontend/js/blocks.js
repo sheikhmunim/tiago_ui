@@ -13,7 +13,7 @@ Blockly.defineBlocksWithJsonArray([
     ],
     previousStatement: null,
     nextStatement: null,
-    colour: 160,
+    colour: "#0e7490",
     tooltip: "Move the robot forward at the given speed for the given duration."
   },
   {
@@ -25,7 +25,7 @@ Blockly.defineBlocksWithJsonArray([
     ],
     previousStatement: null,
     nextStatement: null,
-    colour: 230,
+    colour: "#155e75",
     tooltip: "Move the robot backward at the given speed for the given duration."
   },
   {
@@ -37,7 +37,7 @@ Blockly.defineBlocksWithJsonArray([
     ],
     previousStatement: null,
     nextStatement: null,
-    colour: 65,
+    colour: "#0891b2",
     tooltip: "Turn the robot left (counter-clockwise)."
   },
   {
@@ -49,7 +49,7 @@ Blockly.defineBlocksWithJsonArray([
     ],
     previousStatement: null,
     nextStatement: null,
-    colour: 65,
+    colour: "#06b6d4",
     tooltip: "Turn the robot right (clockwise)."
   },
   {
@@ -57,7 +57,7 @@ Blockly.defineBlocksWithJsonArray([
     message0: "Stop",
     previousStatement: null,
     nextStatement: null,
-    colour: 0,
+    colour: "#164e63",
     tooltip: "Stop all robot motion immediately."
   },
   {
@@ -68,7 +68,7 @@ Blockly.defineBlocksWithJsonArray([
     ],
     previousStatement: null,
     nextStatement: null,
-    colour: 290,
+    colour: "#7c3aed",
     tooltip: "Pause execution for the given duration."
   },
 
@@ -96,7 +96,7 @@ Blockly.defineBlocksWithJsonArray([
       }
     ],
     output: "Boolean",
-    colour: 20,
+    colour: "#a21caf",
     tooltip: "True if the nearest obstacle is closer or farther than the given distance."
   },
 
@@ -112,7 +112,7 @@ Blockly.defineBlocksWithJsonArray([
     args2: [{ type: "input_statement", name: "ELSE" }],
     previousStatement: null,
     nextStatement: null,
-    colour: 210,
+    colour: "#b45309",
     tooltip: "Execute 'do' blocks if condition is true, otherwise execute 'else' blocks."
   }
 ]);
@@ -152,6 +152,7 @@ function blockToCommand(block) {
 
   if (action === "if_else") {
     return {
+      id: block.id,
       action: "if_else",
       condition: getCondition(block),
       then: getStatementBlocks(block, "THEN"),
@@ -161,7 +162,7 @@ function blockToCommand(block) {
 
   if (block.getField("SPEED"))    params.speed    = parseFloat(block.getFieldValue("SPEED"));
   if (block.getField("DURATION")) params.duration = parseFloat(block.getFieldValue("DURATION"));
-  return { action, params };
+  return { id: block.id, action, params };
 }
 
 /**

@@ -59,13 +59,11 @@ class BlockExecutor:
                     self.ros.stop()
                     break
 
-                await self.broadcast({"type": "execution", "status": "running",
-                                      "step": i + 1, "total": total, "block": block.get("action")})
+                await self._broadcast_step("running", block, i + 1, total)
 
-                await self._run_block(block)
+                await self._run_block(block, i + 1, total)
 
-                await self.broadcast({"type": "execution", "status": "step_done",
-                                      "step": i + 1, "total": total, "block": block.get("action")})
+                await self._broadcast_step("step_done", block, i + 1, total)
 
             else:
                 # All blocks completed
@@ -78,7 +76,17 @@ class BlockExecutor:
             self._running = False
             self.ros.stop()
 
-    async def _run_block(self, block: dict):
+    async def _broadcast_step(self, status: str, block: dict, step: int, total: int):
+        """Broadcast a running/step_done event for a single block, carrying its
+        Blockly id so the frontend can highlight the exact block instance —
+        including blocks nested inside if_else branches."""
+        await self.broadcast({
+            "type": "execution", "status": status,
+            "step": step, "total": total,
+            "block": block.get("action"), "id": block.get("id"),
+        })
+
+    async def _run_block(self, block: dict, step: int, total: int):
         action = block.get("action")
         params = block.get("params", {})
 
@@ -107,19 +115,24 @@ class BlockExecutor:
         elif action == "if_else":
             condition = block.get("condition")
             if self._evaluate_condition(condition):
-                await self._execute_blocks(block.get("then", []))
+                await self._execute_blocks(block.get("then", []), step, total)
             else:
-                await self._execute_blocks(block.get("else", []))
+                await self._execute_blocks(block.get("else", []), step, total)
 
         else:
             log.warning(f"Unknown block action: {action}")
 
-    async def _execute_blocks(self, blocks: List[dict]):
-        """Recursively execute a list of blocks (used for nested control structures)."""
+    async def _execute_blocks(self, blocks: List[dict], parent_step: int, parent_total: int):
+        """Recursively execute a list of blocks (used for nested control structures).
+        Broadcasts running/step_done for each nested block under the parent
+        if_else's step number, so the currently-executing child block can be
+        highlighted the same way a top-level block is."""
         for block in blocks:
             if self._abort or not self.safety.is_safe:
                 break
-            await self._run_block(block)
+            await self._broadcast_step("running", block, parent_step, parent_total)
+            await self._run_block(block, parent_step, parent_total)
+            await self._broadcast_step("step_done", block, parent_step, parent_total)
 
     def _evaluate_condition(self, condition: Optional[dict]) -> bool:
         """Evaluate a lidar_compare condition against the current LiDAR reading."""
