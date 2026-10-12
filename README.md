@@ -77,6 +77,18 @@ This script:
 - Kills any stale process already bound to port 8000
 - Starts the FastAPI app with `uvicorn` on `0.0.0.0:8000`
 
+#### How `/dev/tcp/bandit` works
+
+The reachability check in `start.sh` is:
+
+```bash
+timeout 2 bash -c 'echo > /dev/tcp/bandit/22'
+```
+
+`/dev/tcp/bandit/22` is not a real file or device, and nothing on the system creates it. When bash redirects to a path of the form `/dev/tcp/<host>/<port>`, bash itself opens a TCP connection to that host and port. The redirect succeeds only if the connection opens, so this is a quick test that the robot's SSH port (22) is reachable.
+
+`bandit` is the robot's hostname. It resolves inside the container because the container is started with `--add-host=bandit:10.234.6.53`, which adds an entry to the container's `/etc/hosts`. If that flag is missing, the check fails with "Name or service not known". This is a bash feature, so it only works when run with `bash`, not `sh`.
+
 ### 4. Open the UI
 
 Once `start.sh` prints the URLs, open one of them in a browser on the same network:
